@@ -123,14 +123,14 @@ clang_arch = 'x86_64'
 build-only = true
 
 [[matrix.mac.config]]
-runner = 'macos-latest'
+runner = 'macos-15'
 arch = 'aarch64'
 platform-suffix = 'mac-arm64'
 clang_arch = 'arm64'
 build-only = true
 
 [[matrix.mac.config]]
-runner = 'macos-latest'
+runner = 'macos-15'
 arch = 'universal'
 platform-suffix = 'mac'
 itch-manifest = 'mac'
