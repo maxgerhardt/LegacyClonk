@@ -19,6 +19,8 @@
 #include <C4Game.h>
 #include <C4GraphicsSystem.h>
 #include <C4Log.h>
+#include <C4Player.h>
+#include <C4PlayerList.h>
 #include <C4NetIO.h>
 #include <C4Viewport.h>
 #include <C4Wrappers.h>
@@ -27,6 +29,8 @@
 #include <charconv>
 #include <cstring>
 #include <format>
+#include <vector>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -292,6 +296,56 @@ bool C4ControlServer::Handle(const std::string_view command, const std::string &
 		viewport->ViewX = x - viewport->ViewWdt / 2;
 		viewport->ViewY = y - viewport->ViewHgt / 2;
 		Respond(true, std::format("view={} {}", viewport->ViewX, viewport->ViewY));
+	}
+	else if (command == "players")
+	{
+		std::string out;
+		for (C4Player *plr = Game.Players.First; plr; plr = plr->Next)
+		{
+			C4Object *const cursor{plr->Cursor};
+			out += std::format("number={} name={} cursor={} eliminated={} jnr={}\n", plr->Number, plr->GetName(),
+				cursor ? cursor->Number : -1, plr->Eliminated ? 1 : 0, plr->ControlStyle ? 1 : 0);
+		}
+		Respond(true, out);
+	}
+	else if (command == "key")
+	{
+		// "<plr> <com> [up]"
+		std::vector<std::string_view> words;
+		for (std::size_t pos = 0; pos < payload.size();)
+		{
+			const auto end = std::min(payload.find(' ', pos), payload.size());
+			if (end > pos) words.emplace_back(payload.data() + pos, end - pos);
+			pos = end + 1;
+		}
+		static constexpr std::pair<std::string_view, int32_t> names[]{
+			{"Left", COM_Left}, {"Right", COM_Right}, {"Up", COM_Up}, {"Down", COM_Down}, {"Throw", COM_Throw},
+			{"Dig", COM_Dig}, {"Special", COM_Special}, {"Special2", COM_Special2}, {"PlayerMenu", COM_PlayerMenu}};
+		int32_t plr = -1, com = COM_None;
+		if (words.size() >= 2)
+		{
+			std::from_chars(words[0].data(), words[0].data() + words[0].size(), plr);
+			for (const auto &[name, value] : names)
+				if (words[1] == name) com = value;
+			if (com == COM_None) std::from_chars(words[1].data(), words[1].data() + words[1].size(), com);
+		}
+		const bool release{words.size() >= 3 && words[2] == "up"};
+		if (com == COM_None || !Game.Players.Get(plr))
+		{
+			Respond(false, Game.Players.Get(plr) || words.size() < 2 ? "usage: key <player number> <Left|Right|Up|Down|Throw|Dig|Special|Special2|PlayerMenu|number> [up]" : "no such player");
+			return true;
+		}
+		if (release)
+		{
+			if (com < COM_Left || com > COM_Special2)
+			{
+				Respond(false, "only Left..Special2 can be released");
+				return true;
+			}
+			com += 16; // COM_*_R
+		}
+		Game.LocalPlayerControl(plr, com);
+		Respond(true, std::format("player={} com={}", plr, com));
 	}
 	else
 	{

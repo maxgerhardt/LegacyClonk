@@ -30,6 +30,10 @@
 //   step <frames>          -> runs that many frames, then pauses; answers "frame=<n>" when done
 //   viewport               -> opens a viewport without player (free view) if there is none
 //   view <x> <y>           -> centers the free viewport on landscape position x/y
+//   players                -> one line per player: "number=<n> name=<name> cursor=<object number|-1> eliminated=<0|1> jnr=<0|1>"
+//   key <plr> <com> [up]   -> presses (or with "up" releases) a control of player <plr> like its keyboard would:
+//                             com = Left, Right, Up, Down, Throw, Dig, Special, Special2, PlayerMenu or a COM_ number.
+//                             Goes through the control queue (double presses are detected from the timing).
 //   quit                   -> closes the engine
 // Single player games only: script execution bypasses the network control queue.
 
