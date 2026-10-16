@@ -1671,7 +1671,7 @@ bool C4AulScriptFunc::HasStrictNil() const noexcept
 	return pOrgScript->Strict >= C4AulScriptStrict::STRICT3;
 }
 
-C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char *szContext, bool fPassErrors, C4AulScriptStrict Strict)
+C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char *szContext, bool fPassErrors, C4AulScriptStrict Strict, bool fStatements)
 {
 #ifdef DEBUGREC_SCRIPT
 	AddDbgRec(RCT_DirectExec, szScript, strlen(szScript) + 1);
@@ -1683,6 +1683,8 @@ C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char
 	// Create a new temporary script as child of this script
 	C4AulScript *pScript = new C4AulScript();
 	pScript->Script.Copy(szScript);
+	// statements are parsed like the body of a new-style function, which the closing brace ends
+	if (fStatements) pScript->Script.Append("\n}");
 	pScript->ScriptName = std::format("{} in {}", szContext, ScriptName);
 	pScript->Strict = Strict;
 	pScript->Temporary = true;
@@ -1701,10 +1703,11 @@ C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char
 	C4AulScriptFunc *pFunc = new C4AulScriptFunc(pScript, "");
 	pFunc->Script = pScript->Script.getData();
 	pFunc->pOrgScript = pScript;
+	pFunc->bNewFormat = fStatements;
 	// Parse function
 	try
 	{
-		pScript->ParseFn(pFunc, true);
+		pScript->ParseFn(pFunc, !fStatements);
 	}
 	catch (const C4AulError &ex)
 	{

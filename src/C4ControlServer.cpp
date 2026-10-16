@@ -248,9 +248,10 @@ bool C4ControlServer::Handle(const std::string_view command, const std::string &
 			Game.FrameCounter, Game.IsPaused() ? 1 : 0, Game.IsRunning ? 1 : 0, Game.Players.GetCount(),
 			Game.Objects.ObjectCount(), GBackWdt, GBackHgt));
 	}
-	else if (command == "eval")
+	else if (command == "eval" || command == "exec")
 	{
-		const C4Value result{Game.Script.DirectExec(nullptr, payload.c_str(), "control script", false, C4AulScriptStrict::MAXSTRICT)};
+		// eval: one expression (like the console); exec: statements with return
+		const C4Value result{Game.Script.DirectExec(nullptr, payload.c_str(), "control script", false, C4AulScriptStrict::MAXSTRICT, command == "exec")};
 		Respond(true, result.GetDataString());
 	}
 	else if (command == "pause" || command == "resume")

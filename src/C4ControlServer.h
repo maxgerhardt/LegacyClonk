@@ -24,7 +24,8 @@
 // Commands:
 //   ping                   -> "pong"
 //   status                 -> "frame=<n> paused=<0|1> running=<0|1> players=<n> objects=<n> landscape=<w>x<h>"
-//   eval <C4Script>        -> result of the script (executed in scenario script context, #strict 3)
+//   eval <expression>      -> result of a C4Script expression (scenario script context, #strict 3)
+//   exec <statements>      -> result of C4Script statements ("var x = ...; return x;"), same context
 //   pause / resume         -> "paused=<0|1>"
 //   step <frames>          -> runs that many frames, then pauses; answers "frame=<n>" when done
 //   viewport               -> opens a viewport without player (free view) if there is none
