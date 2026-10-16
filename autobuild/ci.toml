@@ -114,13 +114,7 @@ itch-manifest = 'linux'
 gcc_arch = 'aarch64'
 
 [matrix.mac]
-runner = 'macos-15-intel'
-
-[[matrix.mac.config]]
-arch = 'x64'
-platform-suffix = 'mac'
-clang_arch = 'x86_64'
-build-only = true
+runner = 'macos-15'
 
 [[matrix.mac.config]]
 runner = 'macos-15'
