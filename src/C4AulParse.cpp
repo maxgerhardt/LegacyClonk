@@ -1429,6 +1429,14 @@ void C4AulScript::ParseFn(C4AulScriptFunc *Fn, bool fExprOnly)
 	return;
 }
 
+void C4AulScript::PreparseFn(C4AulScriptFunc *Fn)
+{
+	// the preparser registers "var" declarations in Fn->VarNamed and generates no code
+	C4AulParseState state(Fn, this, C4AulParseState::PREPARSER);
+	state.Shift();
+	state.Parse_Function();
+}
+
 void C4AulParseState::Parse_Script()
 {
 	bool fDone = false;

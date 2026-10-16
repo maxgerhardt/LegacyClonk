@@ -483,6 +483,7 @@ protected:
 	void AddBCC(C4AulBCCType eType, std::intptr_t = 0, const char *SPos = nullptr); // add byte code chunk and advance
 	bool Preparse(); // preparse script; return if successful
 	void ParseFn(C4AulScriptFunc *Fn, bool fExprOnly = false); // parse single script function
+	void PreparseFn(C4AulScriptFunc *Fn); // collect the local variables of a single function (before ParseFn)
 
 	bool Parse(); // parse preparsed script; return if successful
 	void ParseDescs(); // parse function descs

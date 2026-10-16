@@ -1707,6 +1707,8 @@ C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char
 	// Parse function
 	try
 	{
+		// statements may declare variables: collect them first, like the preparser does for scripts
+		if (fStatements) pScript->PreparseFn(pFunc);
 		pScript->ParseFn(pFunc, !fStatements);
 	}
 	catch (const C4AulError &ex)
