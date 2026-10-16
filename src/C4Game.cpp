@@ -18,6 +18,7 @@
 /* Main class to run the game */
 
 #include <C4Game.h>
+#include <C4ControlServer.h>
 #include <C4Version.h>
 #include <C4Network2Reference.h>
 #include <C4FileMonitor.h>
@@ -3169,6 +3170,9 @@ void C4Game::ParseCommandLine(const char *szCmdLine)
 		if (SEqualNoCase(szParameter, "/ucrw") || SEqualNoCase(szParameter, "/trainedcrew"))
 			Config.General.FairCrew = false;
 		// record dump
+		// local control port for tools (C4ControlServer)
+		if (SEqual2NoCase(szParameter, "/control:"))
+			C4ControlServer::Get().SetPort(atoi(szParameter + 9));
 		if (SEqual2NoCase(szParameter, "/recdump:"))
 			RecordDumpFile.Copy(szParameter + 9);
 		// record stream

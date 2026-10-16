@@ -17,6 +17,7 @@
 /* Main class to initialize configuration and execute the game */
 
 #include <C4Application.h>
+#include <C4ControlServer.h>
 #include <C4Version.h>
 #ifdef _WIN32
 #include <StdRegistry.h>
@@ -458,6 +459,8 @@ void C4Application::Execute()
 			// Save back time
 			iLastGameTick = iThisGameTick;
 		}
+		// Local control port (/control:<port>)
+		if (iRecursionCount <= 1) C4ControlServer::Get().Poll();
 		// Graphics
 		if (!Game.DoSkipFrame)
 		{

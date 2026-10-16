@@ -31,6 +31,8 @@ src/C4Console.h
 src/C4Constants.h
 src/C4Control.cpp
 src/C4Control.h
+src/C4ControlServer.cpp
+src/C4ControlServer.h
 src/C4Coroutine.h
 src/C4Cooldown.h
 src/C4CurlSystem.cpp
