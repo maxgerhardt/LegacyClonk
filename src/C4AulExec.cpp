@@ -25,7 +25,14 @@
 #include <C4ValueHash.h>
 #include <C4Wrappers.h>
 
+#include <chrono>
 #include <format>
+
+// profiler clock: microseconds (timeGetTime's milliseconds rounded nearly every script call to 0)
+static uint64_t ProfilerNow()
+{
+	return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+}
 
 C4AulExecError::C4AulExecError(C4Object *pObj, const std::string_view error)
 	: cObj(pObj)
@@ -138,7 +145,7 @@ private:
 	std::shared_ptr<spdlog::logger> traceLogger;
 	int iTraceStart;
 	bool fProfiling;
-	time_t tDirectExecStart, tDirectExecTotal; // profiler time for DirectExec
+	uint64_t tDirectExecStart, tDirectExecTotal; // profiler time for DirectExec (microseconds)
 	C4AulScript *pProfiledScript;
 
 public:
@@ -149,8 +156,8 @@ public:
 	void StartProfiling(C4AulScript *pScript); // resets profling times and starts recording the times
 	void StopProfiling(); // stop the profiler and displays results
 	void AbortProfiling() { fProfiling = false; }
-	inline void StartDirectExec() { if (fProfiling) tDirectExecStart = timeGetTime(); }
-	inline void StopDirectExec() { if (fProfiling) tDirectExecTotal += timeGetTime() - tDirectExecStart; }
+	inline void StartDirectExec() { if (fProfiling) tDirectExecStart = ProfilerNow(); }
+	inline void StopDirectExec() { if (fProfiling) tDirectExecTotal += ProfilerNow() - tDirectExecStart; }
 
 private:
 	void PushContext(const C4AulScriptContext &rContext)
@@ -166,7 +173,11 @@ private:
 			pCurCtx->dump(std::move(buf));
 		}
 		// Profiler: Safe time to measure difference afterwards
-		if (fProfiling) pCurCtx->tTime = timeGetTime();
+		if (fProfiling)
+		{
+			pCurCtx->tTime = ProfilerNow();
+			pCurCtx->tChildTime = 0;
+		}
 	}
 
 	void PopContext()
@@ -176,9 +187,15 @@ private:
 		// Profiler adding up times
 		if (fProfiling)
 		{
-			time_t dt = timeGetTime() - pCurCtx->tTime;
-			if (dt && pCurCtx->Func)
+			const uint64_t dt{ProfilerNow() - pCurCtx->tTime};
+			if (pCurCtx->Func)
+			{
 				pCurCtx->Func->tProfileTime += dt;
+				pCurCtx->Func->tProfileSelf += dt > pCurCtx->tChildTime ? dt - pCurCtx->tChildTime : 0;
+				++pCurCtx->Func->profileCalls;
+			}
+			if (pCurCtx > Contexts)
+				(pCurCtx - 1)->tChildTime += dt;
 		}
 		// Trace done?
 		if (iTraceStart >= 0)
@@ -1560,12 +1577,15 @@ void C4AulExec::StartProfiling(C4AulScript *pProfiledScript)
 	fProfiling = true;
 	// resets profling times and starts recording the times
 	this->pProfiledScript = pProfiledScript;
-	time_t tNow = timeGetTime();
+	const uint64_t tNow{ProfilerNow()};
 	tDirectExecStart = tNow; // in case profiling is started from DirectExec
 	tDirectExecTotal = 0;
 	pProfiledScript->ResetProfilerTimes();
 	for (C4AulScriptContext *pCtx = Contexts; pCtx <= pCurCtx; ++pCtx)
+	{
 		pCtx->tTime = tNow;
+		pCtx->tChildTime = 0;
+	}
 }
 
 void C4AulExec::StopProfiling()
@@ -1575,7 +1595,7 @@ void C4AulExec::StopProfiling()
 	fProfiling = false;
 	// collect profiler times
 	C4AulProfiler Profiler{Application.LogSystem.CreateLogger(Config.Logging.AulProfiler)};
-	Profiler.CollectEntry(nullptr, tDirectExecTotal);
+	Profiler.CollectEntry(nullptr, tDirectExecTotal, tDirectExecTotal, 0);
 	pProfiledScript->CollectProfilerTimes(Profiler);
 	Profiler.Show();
 }
@@ -1595,15 +1615,11 @@ void C4AulProfiler::Abort()
 	AulExec.AbortProfiling();
 }
 
-void C4AulProfiler::CollectEntry(C4AulScriptFunc *pFunc, time_t tProfileTime)
+void C4AulProfiler::CollectEntry(C4AulScriptFunc *pFunc, uint64_t tProfileTime, uint64_t tProfileSelf, uint64_t calls)
 {
-	// zero entries are not collected to have a cleaner list
-	if (!tProfileTime) return;
-	// add entry to list
-	Entry e;
-	e.pFunc = pFunc;
-	e.tProfileTime = tProfileTime;
-	Times.push_back(e);
+	// functions that never ran are not collected to have a cleaner list
+	if (!tProfileTime && !calls) return;
+	Times.push_back({pFunc, tProfileTime, tProfileSelf, calls});
 }
 
 void C4AulProfiler::Show()
@@ -1612,12 +1628,12 @@ void C4AulProfiler::Show()
 	std::sort(Times.rbegin(), Times.rend());
 	// display them
 	logger->info("Profiler statistics:");
+	logger->info("total ms\tself ms\tcalls\tfunction (total includes called script functions)");
 	logger->info("==============================");
-	typedef std::vector<Entry> EntryList;
-	for (EntryList::iterator i = Times.begin(); i != Times.end(); ++i)
+	for (const Entry &e : Times)
 	{
-		Entry &e = (*i);
-		logger->info("{:05}ms\t{}", e.tProfileTime, e.pFunc ? (e.pFunc->GetFullName().c_str()) : "Direct exec");
+		logger->info("{:.3f}ms\t{:.3f}ms\t{}\t{}", e.tProfileTime / 1000.0, e.tProfileSelf / 1000.0, e.calls,
+			e.pFunc ? e.pFunc->GetFullName() : std::string{"Direct exec"});
 	}
 	logger->info("==============================");
 	// done!
@@ -1733,7 +1749,11 @@ void C4AulScript::ResetProfilerTimes()
 	C4AulScriptFunc *pSFunc;
 	for (C4AulFunc *pFn = Func0; pFn; pFn = pFn->Next)
 		if ((pSFunc = pFn->SFunc()))
+		{
 			pSFunc->tProfileTime = 0;
+			pSFunc->tProfileSelf = 0;
+			pSFunc->profileCalls = 0;
+		}
 	// reset sub-scripts
 	for (C4AulScript *pScript = Child0; pScript; pScript = pScript->Next)
 		pScript->ResetProfilerTimes();
@@ -1745,7 +1765,7 @@ void C4AulScript::CollectProfilerTimes(class C4AulProfiler &rProfiler)
 	C4AulScriptFunc *pSFunc;
 	for (C4AulFunc *pFn = Func0; pFn; pFn = pFn->Next)
 		if ((pSFunc = pFn->SFunc()))
-			rProfiler.CollectEntry(pSFunc, pSFunc->tProfileTime);
+			rProfiler.CollectEntry(pSFunc, pSFunc->tProfileTime, pSFunc->tProfileSelf, pSFunc->profileCalls);
 	// collect sub-scripts
 	for (C4AulScript *pScript = Child0; pScript; pScript = pScript->Next)
 		pScript->CollectProfilerTimes(rProfiler);

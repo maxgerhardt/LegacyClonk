@@ -268,7 +268,8 @@ struct C4AulScriptContext : public C4AulContext
 	bool TemporaryScript;
 	C4ValueList NumVars;
 	C4AulBCC *CPos;
-	time_t tTime; // initialized only by profiler if active
+	uint64_t tTime; // initialized only by profiler if active (microseconds)
+	uint64_t tChildTime; // profiler: time spent in script functions called from this context
 
 	size_t ParCnt() const { return Vars - Pars; }
 	void dump(std::string Dump = "");
@@ -347,7 +348,7 @@ public:
 
 	C4AulScriptFunc(C4AulScript *pOwner, const char *pName, bool bAtEnd = true) : C4AulFunc(pOwner, pName, bAtEnd),
 		OwnerOverloaded(nullptr), idImage(C4ID_None), iImagePhase(0), Condition(nullptr), ControlMethod(C4AUL_ControlMethod_All),
-		bReturnRef(false), tProfileTime(0)
+		bReturnRef(false), tProfileTime(0), tProfileSelf(0), profileCalls(0)
 	{
 		for (int i = 0; i < C4AUL_MAX_Par; i++) ParType[i] = C4V_Any;
 	}
@@ -364,7 +365,9 @@ public:
 
 	std::string GetFullName(); // get a fully classified name (C4ID::Name) for debug output
 
-	time_t tProfileTime; // internally set by profiler
+	uint64_t tProfileTime; // internally set by profiler: microseconds including called script functions
+	uint64_t tProfileSelf; // the same without the time of script functions called from it
+	uint64_t profileCalls; // calls while profiling
 
 	bool HasStrictNil() const noexcept;
 
@@ -411,7 +414,7 @@ private:
 	struct Entry
 	{
 		C4AulScriptFunc *pFunc;
-		time_t tProfileTime;
+		uint64_t tProfileTime, tProfileSelf, calls; // microseconds
 
 		bool operator<(const Entry &e2) const { return tProfileTime < e2.tProfileTime; }
 	};
@@ -423,7 +426,7 @@ private:
 public:
 	C4AulProfiler(std::shared_ptr<spdlog::logger> logger) : logger{std::move(logger)} {}
 
-	void CollectEntry(C4AulScriptFunc *pFunc, time_t tProfileTime);
+	void CollectEntry(C4AulScriptFunc *pFunc, uint64_t tProfileTime, uint64_t tProfileSelf, uint64_t calls);
 	void Show();
 
 	static void Abort();
