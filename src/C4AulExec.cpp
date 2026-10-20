@@ -169,7 +169,7 @@ public:
 		C4Value *const val{pCurVal};
 		try
 		{
-			return script.DirectExec(obj, expression, "debugger", true, C4AulScriptStrict::MAXSTRICT);
+			return script.DirectExec(obj, expression, "debugger", true, C4AulScriptStrict::MAXSTRICT, false, true);
 		}
 		catch (const C4AulError &e)
 		{
@@ -1719,7 +1719,7 @@ bool C4AulScriptFunc::HasStrictNil() const noexcept
 	return pOrgScript->Strict >= C4AulScriptStrict::STRICT3;
 }
 
-C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char *szContext, bool fPassErrors, C4AulScriptStrict Strict, bool fStatements)
+C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char *szContext, bool fPassErrors, C4AulScriptStrict Strict, bool fStatements, bool passParseErrors)
 {
 #ifdef DEBUGREC_SCRIPT
 	AddDbgRec(RCT_DirectExec, szScript, strlen(szScript) + 1);
@@ -1761,9 +1761,10 @@ C4Value C4AulScript::DirectExec(C4Object *pObj, const char *szScript, const char
 	}
 	catch (const C4AulError &ex)
 	{
-		ex.show();
 		delete pFunc;
 		delete pScript;
+		if (passParseErrors) throw;
+		ex.show();
 		return C4VNull;
 	}
 	pFunc->Code = pScript->Code;

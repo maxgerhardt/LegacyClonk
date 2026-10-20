@@ -526,7 +526,8 @@ public:
 
 public:
 	// directly parse uncompiled script (WARG! CYCLES!); a single expression, or with fStatements a function body (statements, return)
-	C4Value DirectExec(C4Object *pObj, const char *szScript, const char *szContext, bool fPassErrors = false, C4AulScriptStrict Strict = C4AulScriptStrict::MAXSTRICT, bool fStatements = false);
+	// passParseErrors: compile errors are thrown instead of shown (the debugger returns them to its client)
+	C4Value DirectExec(C4Object *pObj, const char *szScript, const char *szContext, bool fPassErrors = false, C4AulScriptStrict Strict = C4AulScriptStrict::MAXSTRICT, bool fStatements = false, bool passParseErrors = false);
 	void ResetProfilerTimes(); // zero all profiler times of owned functions
 	void CollectProfilerTimes(class C4AulProfiler &rProfiler);
 
