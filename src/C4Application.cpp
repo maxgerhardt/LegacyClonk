@@ -17,6 +17,7 @@
 /* Main class to initialize configuration and execute the game */
 
 #include <C4Application.h>
+#include <C4AulDebug.h>
 #include <C4ControlServer.h>
 #include <C4Version.h>
 #ifdef _WIN32
@@ -461,6 +462,8 @@ void C4Application::Execute()
 		}
 		// Local control port (/control:<port>)
 		if (iRecursionCount <= 1) C4ControlServer::Get().Poll();
+		// Script debugger (/debug:<port>)
+		if (iRecursionCount <= 1) C4AulDebug::Get().Poll();
 		// Graphics
 		if (!Game.DoSkipFrame)
 		{

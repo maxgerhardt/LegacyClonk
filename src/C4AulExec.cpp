@@ -19,6 +19,7 @@
 
 #include <C4Aul.h>
 
+#include <C4AulDebug.h>
 #include <C4Object.h>
 #include <C4Config.h>
 #include <C4Game.h>
@@ -141,6 +142,7 @@ private:
 
 	C4AulScriptContext *pCurCtx;
 	C4Value *pCurVal;
+	uint64_t callCounter{0};
 
 	std::shared_ptr<spdlog::logger> traceLogger;
 	int iTraceStart;
@@ -156,6 +158,28 @@ public:
 	void StartProfiling(C4AulScript *pScript); // resets profling times and starts recording the times
 	void StopProfiling(); // stop the profiler and displays results
 	void AbortProfiling() { fProfiling = false; }
+
+	// debugger (C4AulDebug): the context stack, 0 = innermost
+	int ContextCount() const { return ContextStackSize(); }
+	C4AulScriptContext *Context(int index) { return pCurCtx - index; }
+	// runs DirectExec with passed errors; on an error the contexts and values it left are removed again
+	C4Value DebugEval(C4AulScript &script, C4Object *obj, const char *expression, std::string &error)
+	{
+		C4AulScriptContext *const ctx{pCurCtx};
+		C4Value *const val{pCurVal};
+		try
+		{
+			return script.DirectExec(obj, expression, "debugger", true, C4AulScriptStrict::MAXSTRICT);
+		}
+		catch (const C4AulError &e)
+		{
+			error = e.GetErrorMessage();
+			while (pCurCtx > ctx) PopContext();
+			PopValuesUntil(val);
+			StopDirectExec();
+			return C4VNull;
+		}
+	}
 	inline void StartDirectExec() { if (fProfiling) tDirectExecStart = ProfilerNow(); }
 	inline void StopDirectExec() { if (fProfiling) tDirectExecTotal += ProfilerNow() - tDirectExecStart; }
 
@@ -165,6 +189,7 @@ private:
 		if (pCurCtx >= Contexts + MAX_CONTEXT_STACK - 1)
 			throw C4AulExecError(pCurCtx->Obj, "context stack overflow!");
 		*++pCurCtx = rContext;
+		pCurCtx->CallId = ++callCounter;
 		// Trace?
 		if (iTraceStart >= 0)
 		{
@@ -359,6 +384,10 @@ private:
 
 C4AulExec AulExec;
 
+int AulExecContextCount() { return AulExec.ContextCount(); }
+C4AulScriptContext *AulExecContext(int index) { return AulExec.Context(index); }
+C4Value AulExecDebugEval(C4AulScript &script, C4Object *obj, const char *expression, std::string &error) { return AulExec.DebugEval(script, obj, expression, error); }
+
 C4Value C4AulExec::Exec(C4AulScriptFunc *pSFunc, C4Object *pObj, const C4Value *pnPars, bool fPassErrors, bool fTemporaryScript)
 {
 	// Push parameters
@@ -404,6 +433,7 @@ C4Value C4AulExec::Exec(C4AulBCC *pCPos, bool fPassErrors)
 	{
 		for (;;)
 		{
+			if (C4AulDebug::IsActive()) C4AulDebug::Get().OnStep(pCurCtx, pCPos, ContextStackSize());
 			bool fJump = false;
 			switch (pCPos->bccType)
 			{
@@ -1350,6 +1380,8 @@ C4Value C4AulExec::Exec(C4AulBCC *pCPos, bool fPassErrors)
 	}
 	catch (const C4AulError &e)
 	{
+		// debugger: stop before the stack unwinds
+		if (C4AulDebug::IsActive() && pCurCtx >= Contexts) C4AulDebug::Get().OnError(pCurCtx, pCPos, e);
 		// Save current position
 		pOldCtx->CPos = pCPos;
 		// Pass?

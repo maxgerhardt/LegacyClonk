@@ -70,6 +70,7 @@ public:
 	C4AulError(const C4AulError &Error) : message{Error.message}, isWarning{Error.isWarning} {}
 	virtual ~C4AulError() {}
 	virtual void show() const; // present error message
+	const std::string &GetErrorMessage() const { return message; }
 };
 
 // parse error
@@ -270,6 +271,7 @@ struct C4AulScriptContext : public C4AulContext
 	C4AulBCC *CPos;
 	uint64_t tTime; // initialized only by profiler if active (microseconds)
 	uint64_t tChildTime; // profiler: time spent in script functions called from this context
+	uint64_t CallId; // unique per call (debugger: tells two calls in the same stack slot apart)
 
 	size_t ParCnt() const { return Vars - Pars; }
 	void dump(std::string Dump = "");
@@ -538,6 +540,7 @@ public:
 	friend class C4AulScriptFunc;
 	friend class C4AulScriptEngine;
 	friend class C4AulParseState;
+	friend class C4AulDebugScriptWalker;
 };
 
 // holds all C4AulScripts

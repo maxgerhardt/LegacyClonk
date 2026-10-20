@@ -9,6 +9,8 @@ src/C4AudioSystem.h
 src/C4AudioSystemNone.h
 src/C4Aul.cpp
 src/C4Aul.h
+src/C4AulDebug.cpp
+src/C4AulDebug.h
 src/C4AulExec.cpp
 src/C4AulLink.cpp
 src/C4AulParse.cpp

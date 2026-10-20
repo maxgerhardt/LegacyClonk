@@ -18,6 +18,7 @@
 /* Main class to run the game */
 
 #include <C4Game.h>
+#include <C4AulDebug.h>
 #include <C4ControlServer.h>
 #include <C4Version.h>
 #include <C4Network2Reference.h>
@@ -2789,6 +2790,9 @@ void C4Game::LinkScriptEngine()
 
 	// Set name list for globals
 	ScriptEngine.GlobalNamed.SetNameList(&ScriptEngine.GlobalNamedNames);
+
+	// Script debugger with /debugwait: let it set breakpoints before the first script call
+	C4AulDebug::Get().WaitForClient();
 }
 
 bool C4Game::InitPlayers()
@@ -3173,6 +3177,11 @@ void C4Game::ParseCommandLine(const char *szCmdLine)
 		// local control port for tools (C4ControlServer)
 		if (SEqual2NoCase(szParameter, "/control:"))
 			C4ControlServer::Get().SetPort(atoi(szParameter + 9));
+		// script debugger (C4AulDebug); /debugwait: wait for its client before the first script runs
+		if (SEqual2NoCase(szParameter, "/debug:"))
+			C4AulDebug::Get().SetPort(atoi(szParameter + 7));
+		if (SEqualNoCase(szParameter, "/debugwait"))
+			C4AulDebug::Get().SetWaitForClient(true);
 		if (SEqual2NoCase(szParameter, "/recdump:"))
 			RecordDumpFile.Copy(szParameter + 9);
 		// record stream

@@ -139,6 +139,9 @@ public:
 
 	C4AulScriptFunc *Fn; C4AulScript *a;
 	const char *SPos; // current position in the script
+	const char *TokenStart{nullptr}; // start of the token GetNextToken read last
+	const char *TokenSPos{nullptr}; // start of the current token (Shift)
+	const char *PrevTokenSPos{nullptr}; // start of the token before it: the last one the grammar consumed
 	char Idtf[C4AUL_MAX_Identifier]; // current identifier
 	C4AulTokenType TokenType; // current token type
 	std::intptr_t cInt; // current int constant (std::intptr_t for compatibility with x86_64)
@@ -524,6 +527,7 @@ C4AulTokenType C4AulParseState::GetNextToken(char *pToken, std::intptr_t *pInt, 
 	if (!AdvanceSpaces()) return ATT_EOF;
 	// store offset
 	const char *SPos0 = SPos;
+	TokenStart = SPos;
 	int Len = 0;
 	// token get state
 	enum TokenGetState
@@ -1138,8 +1142,9 @@ void C4AulParseState::AddBCC(C4AulBCCType eType, std::intptr_t X)
 		}
 	}
 
-	// Add
-	a->AddBCC(eType, X, SPos);
+	// Add; the source position is the start of the last consumed token (SPos is past the lookahead token, which
+	// is often on the next line: error traces and the debugger would show that line)
+	a->AddBCC(eType, X, PrevTokenSPos ? PrevTokenSPos : SPos);
 
 	// Reset jump flag
 	fJump = false;
@@ -1383,7 +1388,9 @@ const char *C4AulParseState::GetTokenName(C4AulTokenType TokenType)
 
 void C4AulParseState::Shift(HoldStringsPolicy HoldStrings, bool bOperator)
 {
+	PrevTokenSPos = TokenSPos;
 	TokenType = GetNextToken(Idtf, &cInt, HoldStrings, bOperator);
+	TokenSPos = TokenStart;
 }
 
 void C4AulParseState::Match(C4AulTokenType RefTokenType, const char *Message)
